@@ -1,6 +1,7 @@
 from Detector import main_app
 from create_classifier import train_classifer
 from create_dataset import start_capture
+from create_dataset import augment_captured_images
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import messagebox,PhotoImage
@@ -99,8 +100,25 @@ class PageOne(tk.Frame):
         self.buttoncanc.grid(row=1, column=0, pady=10, ipadx=5, ipady=4)
         self.buttonext.grid(row=1, column=1, pady=10, ipadx=5, ipady=4)
         self.buttonclear.grid(row=1, ipadx=5, ipady=4, column=2, pady=10)
+    # def start_training(self):
+    #     global names
+    #     if self.user_name.get() == "None":
+    #         messagebox.showerror("Error", "Name cannot be 'None'")
+    #         return
+    #     elif self.user_name.get() in names:
+    #         messagebox.showerror("Error", "User already exists!")
+    #         return
+    #     elif len(self.user_name.get()) == 0:
+    #         messagebox.showerror("Error", "Name cannot be empty!")
+    #         return
+    #     name = self.user_name.get()
+    #     names.add(name)
+    #     self.controller.active_name = name
+    #     self.controller.frames["PageTwo"].refresh_names()
+    #     self.controller.show_frame("PageThree")
     def start_training(self):
         global names
+
         if self.user_name.get() == "None":
             messagebox.showerror("Error", "Name cannot be 'None'")
             return
@@ -110,12 +128,25 @@ class PageOne(tk.Frame):
         elif len(self.user_name.get()) == 0:
             messagebox.showerror("Error", "Name cannot be empty!")
             return
+
         name = self.user_name.get()
+
+        # Check if the name is already registered
+        with open("registered_criminals.txt", "r") as f:
+            registered_names = f.read().strip().split()
+            if name in registered_names:
+                messagebox.showerror("Error", "Criminal already registered!")
+                return
+
+        # Add the name to the set and update the registered_criminals.txt file
         names.add(name)
+        with open("registered_criminals.txt", "a") as f:
+            f.write(name + "\n")
+
         self.controller.active_name = name
         self.controller.frames["PageTwo"].refresh_names()
         self.controller.show_frame("PageThree")
-        
+            
     def clear(self):
         self.user_name.delete(0, 'end')
 
@@ -147,6 +178,9 @@ class PageTwo(tk.Frame):
             return
         self.controller.active_name = self.user_name.get()
         self.controller.show_frame("PageFour")  
+    # def next_foo(self):
+    #     self.controller.active_name = ''  # Set active_name to an empty string
+    #     self.controller.show_frame("PageFour")  
         
     def clear(self):
         self.user_name.delete(0, 'end')
@@ -173,9 +207,17 @@ class PageThree(tk.Frame):
         self.numimglabel = tk.Label(self, text="Number of images captured = 0", font='Helvetica 12 bold', fg="#263942")
         self.numimglabel.grid(row=0, column=0, columnspan=2, sticky="ew", pady=10)
         self.capturebutton = tk.Button(self, text="Capture Data Set", fg="#ffffff", bg="#263942", command=self.capimg)
+        self.uploadbutton = tk.Button(self, text="Upload Image", fg="#ffffff", bg="#263942", command=self.image_upload)
         self.trainbutton = tk.Button(self, text="Train The Model", fg="#ffffff", bg="#263942",command=self.trainmodel)
+        self.augmentbutton = tk.Button(self, text="Augment the Image", fg="#ffffff", bg="#263942",command=self.augment)
         self.capturebutton.grid(row=1, column=0, ipadx=5, ipady=4, padx=10, pady=20)
         self.trainbutton.grid(row=1, column=1, ipadx=5, ipady=4, padx=10, pady=20)
+        self.uploadbutton.grid(row=2, column=0, ipadx=5, ipady=4, padx=10, pady=20)
+        self.augmentbutton.grid(row=2, column=1, ipadx=5, ipady=4, padx=10, pady=20)
+
+        self.path_label = tk.Label(self, text="", font='Helvetica 10', fg="gray")
+        self.path_label.grid(row=3, column=0, sticky="ew", pady=10)
+        self.uploaded_image_path = ""
 
     def capimg(self):
         self.numimglabel.config(text=str("Captured Images = 0 "))
@@ -192,7 +234,25 @@ class PageThree(tk.Frame):
         messagebox.showinfo("SUCCESS", "The model has been successfully trained!")
         self.controller.show_frame("PageFour")
 
+    def augment(self):
+        messagebox.showinfo("INSTRUCTIONS", "We will now augment the captured images.")
+        x= augment_captured_images(self.controller.active_name, self.uploaded_image_path)
+        self.controller.num_of_images = x
+        messagebox.showinfo("SUCCESS", "Image augmentation completed.")
 
+    def image_upload(self):
+        file_path = filedialog.askopenfilename(title="Select Image File", filetypes=[("Image files", "*.png;*.jpg;*.jpeg")])
+        if file_path:
+            try:
+                with open(file_path, 'r'):
+                    pass  # Test if the file can be opened for reading
+            except Exception as e:
+                self.path_label.config(text=f"Error: {e}")
+                return
+
+            # self.controller.active_name = self.controller.frames["PageOne"].user_name.get()
+            self.uploaded_image_path = file_path
+            self.path_label.config(text=f"Selected Image: {file_path}")
 # class PageFour(tk.Frame):
 
     # def __init__(self, parent, controller):
@@ -231,8 +291,11 @@ class PageFour(tk.Frame):
         button_upload = tk.Button(self, text="Face Recognition using Image Upload", command=self.open_image_recognition, fg="#ffffff", bg="#263942")
         button_upload.grid(row=3, column=0, sticky="ew", ipadx=5, ipady=4, padx=10, pady=10)
 
+        button_video = tk.Button(self, text="Face Recognition using Video Upload", command=self.open_video_recognition, fg="#ffffff", bg="#263942")
+        button_video.grid(row=4, column=0, sticky="ew", ipadx=5, ipady=4, padx=10, pady=10)
+
         button_home = tk.Button(self, text="Go to Home Page", command=lambda: self.controller.show_frame("StartPage"), bg="#ffffff", fg="#263942")
-        button_home.grid(row=4, column=0, sticky="ew", ipadx=5, ipady=4, padx=10, pady=10)
+        button_home.grid(row=5, column=0, sticky="ew", ipadx=5, ipady=4, padx=10, pady=10)
 
     # def open_camera_recognition(self):
     #     self.controller.active_name = self.controller.frames["PageOne"].user_name.get()
@@ -257,6 +320,23 @@ class PageFour(tk.Frame):
             main_app(self.controller.active_name, image_path=file_path)
         else:
             self.path_label.config(text="No image selected.")
+
+    def open_video_recognition(self):
+        video_path = filedialog.askopenfilename(title="Select Video File", filetypes=[("Video files", "*.mp4;*.avi")])
+        if video_path:
+            try:
+                with open(video_path, 'r'):
+                    pass  # Test if the file can be opened for reading
+            except Exception as e:
+                self.path_label.config(text=f"Error: {e}")
+                return
+
+            # self.controller.active_name = self.controller.frames["PageOne"].user_name.get()
+            self.path_label.config(text=f"Selected Video: {video_path}")
+            self.controller.show_frame("PageFour")
+            main_app(self.controller.active_name, video_path=video_path)
+        else:
+            self.path_label.config(text="No video selected.")
     '''
     def gender_age_pred(self):
        ageAndgender()
